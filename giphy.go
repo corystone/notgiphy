@@ -17,11 +17,28 @@ type SearchResult struct {
 }
 
 type GifData struct {
-	Id       string `json:"id"`
-	EmbedURL string `json:"embed_url"`
+	Id       string  `json:"id"`
+	EmbedURL string  `json:"embed_url"`
+	Images   Images `json:"images"`
 }
 
-func (c *GifClient) Search(query string) ([]string, error) {
+type Images struct {
+	FixedWidthSmallStill ImageData `json:"fixed_width_small_still"`
+	Downsized ImageData `json:"downsized"`
+}
+
+type ImageData struct {
+	URL string `json:"url"`
+}
+
+type GifSearchResult struct {
+	Id       string `json:"id"`
+	EmbedURL string `json:"embed_url"`
+	StillURL string `json:"still_url"`
+	DownsizedURL string `json:"downsized_url"`
+}
+
+func (c *GifClient) Search(query string) ([]GifSearchResult, error) {
 	url := "https://api.giphy.com/v1/gifs/search"
 	req, reqErr := http.NewRequest("GET", url, nil)
 	if reqErr != nil {
@@ -43,24 +60,23 @@ func (c *GifClient) Search(query string) ([]string, error) {
 		return nil, err
 	}
 
-	var result SearchResult
+	var search SearchResult
 	htmlData, readErr := ioutil.ReadAll(resp.Body)
 	if readErr != nil {
 		return nil, readErr
 	}
 	fmt.Printf("entire body: %+v\n", string(htmlData[:]))
-	//err = json.NewDecoder(htmlData).Decode(&result)
-	err = json.Unmarshal(htmlData, &result)
+	//err = json.NewDecoder(htmlData).Decode(&search)
+	err = json.Unmarshal(htmlData, &search)
 	if err != nil {
 		return nil, err
 	}
-	fmt.Printf("entire result: %+v\n", result)
-	fmt.Printf("entire result.Gifs: %+v\n", result.Gifs)
-	results := make([]string, 0, 20)
-	for _, gif := range result.Gifs {
-		fmt.Printf("result gif: %+v\n", gif)
-		results = append(results, gif.EmbedURL)
+	results := make([]GifSearchResult, 0, len(search.Gifs))
+	for _, gif := range search.Gifs {
+		result := GifSearchResult{Id: gif.Id, EmbedURL: gif.EmbedURL, StillURL: gif.Images.FixedWidthSmallStill.URL, DownsizedURL: gif.Images.Downsized.URL}
+		results = append(results, result)
 	}
+
 	return results, nil
 }
 

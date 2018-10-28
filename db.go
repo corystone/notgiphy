@@ -59,7 +59,7 @@ func (m *memorydb) SessionCreate(user, password string) (string, error) {
 		}
 	}
 	cookie := randomCookie()
-	m.sessions[user] = cookie
+	m.sessions[cookie] = user
 	return cookie, nil
 }
 

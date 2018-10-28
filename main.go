@@ -1,12 +1,36 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
 	"time"
 )
 
+func authRequired(next http.Handler, db Db) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/" || r.URL.Path == "/auth" {
+			next.ServeHTTP(w, r)
+			return
+		}
+		cookie, err := r.Cookie("sessionid")
+		if err != nil {
+			w.WriteHeader(http.StatusUnauthorized)
+			fmt.Printf("Cookie error: %+v\n", err)
+			return
+		}
+		sessionid := cookie.Value
+		user, dberr := db.SessionGet(sessionid)
+		if dberr != nil {
+			w.WriteHeader(http.StatusUnauthorized)
+			fmt.Printf("SessionGet error: %+v\n", dberr)
+			return
+		}
+		fmt.Printf("User (%v) has a cookie", user)
+		next.ServeHTTP(w, r)
+	}
+}
 
 func rootHandler(db Db, client *GifClient) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -30,10 +54,11 @@ func rootHandler(db Db, client *GifClient) http.HandlerFunc {
 			return
 		}
 		for _, gif := range gifs {
-			fmt.Fprintf(w, "gif: %v\n", gif)
 			fmt.Printf("GIF: %v\n", gif)
 		}
-		return
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(gifs)
 	}
 }
 
@@ -50,7 +75,7 @@ func authHandler(db Db) http.HandlerFunc {
 				return
 			}
 			expiration := time.Now().Add(24 * time.Hour)
-			cookie := http.Cookie{Name: "sessionId", Value: sessionId, Expires: expiration}
+			cookie := http.Cookie{Name: "sessionid", Value: sessionId, Expires: expiration}
 			http.SetCookie(w, &cookie)
 			fmt.Fprintln(w, "Success")
 			return
@@ -91,9 +116,9 @@ func main() {
 		fmt.Fprintln(w, "Hello, you hit bar!")
 	})
 
-//	_ := auth(h)
+	authed := authRequired(h, db)
 
-	err := http.ListenAndServe(":9999", h)
+	err := http.ListenAndServe(":9999", authed)
 	log.Fatal(err)
 }
 
