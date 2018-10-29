@@ -12,6 +12,10 @@ type GifClient struct {
 	client *http.Client
 }
 
+type GifResult struct {
+	Gif GifData `json:"data"`
+}
+
 type SearchResult struct {
 	Gifs []GifData `json:"data"`
 }
@@ -36,6 +40,45 @@ type GifSearchResult struct {
 	EmbedURL string `json:"embed_url"`
 	StillURL string `json:"still_url"`
 	DownsizedURL string `json:"downsized_url"`
+}
+
+func (c *GifClient) Get(id string) (*GifSearchResult, error) {
+	url := "https://api.giphy.com/v1/gifs/" + id
+	req, reqErr := http.NewRequest("GET", url, nil)
+	if reqErr != nil {
+		return nil, fmt.Errorf("Couldnt create request: %s", reqErr)
+	}
+	q := req.URL.Query()
+	q.Add("api_key", c.Key)
+	req.URL.RawQuery = q.Encode()
+
+	fmt.Printf("REQ: %+v\n", req)
+
+	resp, err := c.client.Do(req)
+	if resp != nil {
+		defer resp.Body.Close()
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	var search GifResult
+	htmlData, readErr := ioutil.ReadAll(resp.Body)
+	if readErr != nil {
+		return nil, readErr
+	}
+	fmt.Printf("entire body: %+v\n", string(htmlData[:]))
+	//err = json.NewDecoder(htmlData).Decode(&search)
+	err = json.Unmarshal(htmlData, &search)
+	if err != nil {
+		return nil, err
+	}
+	gif := search.Gif
+	return &GifSearchResult{
+		Id: gif.Id,
+		EmbedURL: gif.EmbedURL,
+		StillURL: gif.Images.FixedWidthSmallStill.URL,
+		DownsizedURL: gif.Images.Downsized.URL}, nil
 }
 
 func (c *GifClient) Search(query string) ([]GifSearchResult, error) {

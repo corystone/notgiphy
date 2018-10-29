@@ -8,6 +8,15 @@ import (
 	"time"
 )
 
+func openCORS(next http.Handler) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Access-Control-Allow-Origin", "http://localhost:4200")
+		w.Header().Set("Access-Control-Allow-Credentials", "true")
+		w.Header().Set("Access-Control-Allow-Methods", "POST, GET, OPTIONS, PUT, DELETE")
+		next.ServeHTTP(w, r)
+	}
+}
+
 func authRequired(next http.Handler, db Db) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/" || r.URL.Path == "/auth" {
@@ -56,9 +65,36 @@ func rootHandler(db Db, client *GifClient) http.HandlerFunc {
 		for _, gif := range gifs {
 			fmt.Printf("GIF: %v\n", gif)
 		}
-		w.Header().Set("Access-Control-Allow-Origin", "*")
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(gifs)
+	}
+}
+
+func gifHandler(client *GifClient) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != "GET" {
+			w.WriteHeader(http.StatusMethodNotAllowed)
+			fmt.Fprintln(w, "Only GETS please")
+			return
+		}
+		id := r.URL.Query().Get("id")
+		if id == "" {
+			w.WriteHeader(http.StatusBadRequest)
+			fmt.Fprintln(w, "BAD ID")
+			return
+		}
+		gif, err := client.Get(id)
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			fmt.Printf("client error: %+v\n", err)
+			return
+		}
+		if gif == nil {
+			w.WriteHeader(http.StatusNotFound)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(gif)
 	}
 }
 
@@ -87,9 +123,21 @@ func authHandler(db Db) http.HandlerFunc {
 			if err != nil {
 				w.WriteHeader(http.StatusBadRequest)
 				fmt.Fprintln(w, err)
+				fmt.Printf("AccountCreate error: %+v\n", err)
 				return
 			}
-			fmt.Fprintln(w, "Account created")
+			sessionId, err := db.SessionCreate(user, password)
+			if err != nil {
+				w.WriteHeader(http.StatusUnauthorized)
+				fmt.Fprintln(w, err)
+				return
+			}
+			expiration := time.Now().Add(24 * time.Hour)
+			cookie := http.Cookie{Name: "sessionid", Value: sessionId, Expires: expiration}
+			http.SetCookie(w, &cookie)
+			fmt.Fprintln(w, "Success")
+		} else if r.Method == "OPTIONS" {
+			fmt.Fprintln(w, "SURE, HAVE SOME OPTIONS")
 			return
 		} else {
 			w.WriteHeader(http.StatusBadRequest)
@@ -107,6 +155,7 @@ func main() {
 	client := NewGifClient(apiKey)
 
 	h.HandleFunc("/", rootHandler(db, client))
+	h.HandleFunc("/gif", gifHandler(client))
 	h.HandleFunc("/auth", authHandler(db))
 	h.HandleFunc("/foo", func(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintln(w, "Hello, you hit foo!")
@@ -116,9 +165,12 @@ func main() {
 		fmt.Fprintln(w, "Hello, you hit bar!")
 	})
 
+	// FIXME. The auth off switch.
 	authed := authRequired(h, db)
+	cors := openCORS(authed)
+	//cors := openCORS(h)
 
-	err := http.ListenAndServe(":9999", authed)
+	err := http.ListenAndServe(":9999", cors)
 	log.Fatal(err)
 }
 
