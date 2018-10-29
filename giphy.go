@@ -5,11 +5,13 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"strconv"
 )
 
 type GifClient struct {
-	Key    string
-	client *http.Client
+	Key     string
+	PerPage int
+	client  *http.Client
 }
 
 type GifResult struct {
@@ -35,14 +37,14 @@ type ImageData struct {
 	URL string `json:"url"`
 }
 
-type GifSearchResult struct {
+type Gif struct {
 	Id       string `json:"id"`
 	EmbedURL string `json:"embed_url"`
 	StillURL string `json:"still_url"`
 	DownsizedURL string `json:"downsized_url"`
 }
 
-func (c *GifClient) Get(id string) (*GifSearchResult, error) {
+func (c *GifClient) Get(id string) (*Gif, error) {
 	url := "https://api.giphy.com/v1/gifs/" + id
 	req, reqErr := http.NewRequest("GET", url, nil)
 	if reqErr != nil {
@@ -74,14 +76,14 @@ func (c *GifClient) Get(id string) (*GifSearchResult, error) {
 		return nil, err
 	}
 	gif := search.Gif
-	return &GifSearchResult{
+	return &Gif{
 		Id: gif.Id,
 		EmbedURL: gif.EmbedURL,
 		StillURL: gif.Images.FixedWidthSmallStill.URL,
 		DownsizedURL: gif.Images.Downsized.URL}, nil
 }
 
-func (c *GifClient) Search(query string) ([]GifSearchResult, error) {
+func (c *GifClient) Search(query string, page int) ([]Gif, error) {
 	url := "https://api.giphy.com/v1/gifs/search"
 	req, reqErr := http.NewRequest("GET", url, nil)
 	if reqErr != nil {
@@ -91,6 +93,11 @@ func (c *GifClient) Search(query string) ([]GifSearchResult, error) {
 	q.Add("api_key", c.Key)
 	q.Add("rating", "g")
 	q.Add("q", query)
+	q.Add("limit", strconv.Itoa(c.PerPage))
+	if page < 1 {
+		page = 1
+	}
+	q.Add("offset", strconv.Itoa((page - 1) * c.PerPage))
 	req.URL.RawQuery = q.Encode()
 
 	fmt.Printf("REQ: %+v\n", req)
@@ -108,21 +115,24 @@ func (c *GifClient) Search(query string) ([]GifSearchResult, error) {
 	if readErr != nil {
 		return nil, readErr
 	}
-	fmt.Printf("entire body: %+v\n", string(htmlData[:]))
+	//fmt.Printf("entire body: %+v\n", string(htmlData[:]))
 	//err = json.NewDecoder(htmlData).Decode(&search)
 	err = json.Unmarshal(htmlData, &search)
 	if err != nil {
 		return nil, err
 	}
-	results := make([]GifSearchResult, 0, len(search.Gifs))
+	results := make([]Gif, 0, len(search.Gifs))
 	for _, gif := range search.Gifs {
-		result := GifSearchResult{Id: gif.Id, EmbedURL: gif.EmbedURL, StillURL: gif.Images.FixedWidthSmallStill.URL, DownsizedURL: gif.Images.Downsized.URL}
+		result := Gif{Id: gif.Id, EmbedURL: gif.EmbedURL, StillURL: gif.Images.FixedWidthSmallStill.URL, DownsizedURL: gif.Images.Downsized.URL}
 		results = append(results, result)
 	}
 
 	return results, nil
 }
 
-func NewGifClient(key string) *GifClient{
-	return &GifClient{Key: key, client: http.DefaultClient}
+func NewGifClient(key string, perPage int) *GifClient{
+	if perPage < 1 {
+		perPage = 1
+	}
+	return &GifClient{Key: key, client: http.DefaultClient, PerPage: perPage}
 }

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"strconv"
 	"time"
 )
 
@@ -54,8 +55,17 @@ func rootHandler(db Db, client *GifClient) http.HandlerFunc {
 			fmt.Fprintln(w, "FIXME. YOU ARE GETTING THE index.html page")
 			return
 		}
-		fmt.Printf("Searching for %v\n", q)
-		gifs, err := client.Search(q)
+		page := 1
+		p := r.FormValue("p")
+		if p != "" {
+			var err error
+			page, err = strconv.Atoi(p)
+			if err != nil {
+				page = 1
+			}
+		}
+		fmt.Printf("Searching for %v, page: %v\n", q, page)
+		gifs, err := client.Search(q, page)
 		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
 			fmt.Fprintln(w, "Internal Server Error")
@@ -152,7 +162,8 @@ func main() {
 	h := http.NewServeMux()
 	// FIXME. Config or ENV or something. This is the "public beta key"
 	apiKey := "dc6zaTOxFJmzC"
-	client := NewGifClient(apiKey)
+	resultsPerPage := 25
+	client := NewGifClient(apiKey, resultsPerPage)
 
 	h.HandleFunc("/", rootHandler(db, client))
 	h.HandleFunc("/gif", gifHandler(client))
