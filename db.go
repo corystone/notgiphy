@@ -7,7 +7,7 @@ import (
 )
 
 type Db interface {
-	AccountCreate(user, password string) (int, error)
+	AccountCreate(user, password string) (error)
 	SessionCreate(user, password string) (string, error)
 	SessionGet(cookie string) (string, error)
 }
@@ -18,20 +18,20 @@ type memorydb struct {
 	m        sync.Mutex
 }
 
-func (m *memorydb) AccountCreate(user, password string) (int, error) {
+func (m *memorydb) AccountCreate(user, password string) (error) {
 	m.m.Lock()
 	defer m.m.Unlock()
 	if _, ok := m.accounts[user]; ok {
-		return -1, fmt.Errorf("User already exists")
+		return fmt.Errorf("User already exists")
 	}
 	if password == "" {
-		return -1, fmt.Errorf("Invalid password")
+		return fmt.Errorf("Invalid password")
 	}
 	m.accounts[user] = password
-	return 1, nil
+	return nil
 }
 
-func randomCookie() string {
+func RandomCookie() string {
 	return fmt.Sprintf("%08x-%04x-%04x-%04x-%012x",
 		rand.Int63n(0xffffffff),
 		rand.Int63n(0xffff),
@@ -58,7 +58,7 @@ func (m *memorydb) SessionCreate(user, password string) (string, error) {
 			break
 		}
 	}
-	cookie := randomCookie()
+	cookie := RandomCookie()
 	m.sessions[cookie] = user
 	return cookie, nil
 }
@@ -73,7 +73,7 @@ func (m *memorydb) SessionGet(cookie string) (string, error) {
 	return "", fmt.Errorf("Invalid cookie")
 }
 
-func NewDB() Db {
+func NewMemoryDB() Db {
 	return &memorydb{
 		accounts: make(map[string]string),
 		sessions: make(map[string]string),

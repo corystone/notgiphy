@@ -38,9 +38,9 @@ type ImageData struct {
 }
 
 type Gif struct {
-	Id       string `json:"id"`
-	EmbedURL string `json:"embed_url"`
-	StillURL string `json:"still_url"`
+	Id           string `json:"id"`
+	EmbedURL     string `json:"embed_url"`
+	StillURL     string `json:"still_url"`
 	DownsizedURL string `json:"downsized_url"`
 }
 

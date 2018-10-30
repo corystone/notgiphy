@@ -129,8 +129,7 @@ func authHandler(db Db) http.HandlerFunc {
 			r.ParseForm()
 			user := r.FormValue("user")
 			password := r.FormValue("password")
-			_, err := db.AccountCreate(user, password)
-			if err != nil {
+			if err := db.AccountCreate(user, password); err != nil {
 				w.WriteHeader(http.StatusBadRequest)
 				fmt.Fprintln(w, err)
 				fmt.Printf("AccountCreate error: %+v\n", err)
@@ -158,7 +157,13 @@ func authHandler(db Db) http.HandlerFunc {
 }
 
 func main() {
-	db := NewDB()
+	//db := NewMemoryDB()
+	fmt.Println("Get a db!")
+	db, err := NewSqliteDB("foo.db")
+	if err != nil {
+		log.Fatal("DB err: %+v\n", err)
+	}
+	fmt.Println("GOT a db!")
 	h := http.NewServeMux()
 	// FIXME. Config or ENV or something. This is the "public beta key"
 	apiKey := "dc6zaTOxFJmzC"
@@ -181,7 +186,9 @@ func main() {
 	cors := openCORS(authed)
 	//cors := openCORS(h)
 
-	err := http.ListenAndServe(":9999", cors)
-	log.Fatal(err)
+	err = http.ListenAndServe(":9999", cors)
+	if err != nil {
+		log.Fatal(err)
+	}
 }
 
