@@ -84,6 +84,168 @@ func (db *sqlitedb) SessionGet(cookie string) (string, error) {
 	return user, nil
 }
 
+func (db *sqlitedb) TagCreate(tag Tag, user string) error {
+	tx, err := db.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	query, err := tx.Prepare("INSERT INTO tags (favorite, tag, user) VALUES (?, ?, ?)")
+	if err != nil {
+		return err
+	}
+	defer query.Close()
+	if _, err := query.Exec(tag.Favorite, tag.Tag, user); err != nil {
+		return err
+	}
+	if err := tx.Commit(); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (db *sqlitedb) TagDelete(tag Tag, user string) error {
+	tx, err := db.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	query, err := tx.Prepare("DELETE FROM tags WHERE favorite = ? and tag = ? and user = ?")
+	if err != nil {
+		return err
+	}
+	defer query.Close()
+	if _, err := query.Exec(tag.Favorite, tag.Tag, user); err != nil {
+		return err
+	}
+	if err := tx.Commit(); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (db *sqlitedb) tagListQuery(favorite, user string) ([]Tag, error) {
+	records := []Tag{}
+	var rows *sql.Rows
+	var err error
+	fmt.Printf("tagListQuery, favorite: %+v, user: %+v\n", favorite, user)
+	if favorite == "" {
+		rows, err = db.db.Query(`SELECT tag, favorite
+                                FROM tags
+                                WHERE user = ?
+                                ORDER BY tag`, user)
+	} else {
+		rows, err = db.db.Query(`SELECT tag, favorite
+                                FROM tags
+                                WHERE user = ? and favorite = ?
+                                ORDER BY tag`, user, favorite)
+	}
+	if err != nil {
+		return nil, err
+	}
+	for rows.Next() {
+		var tag Tag
+		if err := rows.Scan(&tag.Tag, &tag.Favorite); err != nil {
+			return nil, err
+		}
+		fmt.Printf("GOT A TAG? %+v\n", tag)
+		records = append(records, tag)
+	}
+	rows.Close()
+	return records, nil
+}
+
+func (db *sqlitedb) TagList(user string) ([]Tag, error) {
+	return db.tagListQuery("", user)
+}
+
+func (db *sqlitedb) FavoriteTagList(favorite, user string) ([]Tag, error) {
+	return db.tagListQuery(favorite, user)
+}
+
+func (db *sqlitedb) FavoriteCreate(gif *Gif, user string) error {
+	tx, err := db.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	query, err := tx.Prepare("INSERT INTO favorites (id, user, embed_url, still_url, downsized_url) VALUES (?, ?, ?, ?, ?)")
+	if err != nil {
+		return err
+	}
+	defer query.Close()
+	if _, err := query.Exec(gif.Id, user, gif.EmbedURL, gif.StillURL, gif.DownsizedURL); err != nil {
+		return err
+	}
+	if err := tx.Commit(); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (db *sqlitedb) FavoriteDelete(id, user string) error {
+	tx, err := db.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	query, err := tx.Prepare("DELETE FROM tags WHERE favorite = ? and user = ?")
+	if err != nil {
+		return err
+	}
+	defer query.Close()
+	if _, err := query.Exec(id, user); err != nil {
+		return err
+	}
+	query, err = tx.Prepare("DELETE FROM favorites WHERE id = ? and user = ?")
+	if err != nil {
+		return err
+	}
+	defer query.Close()
+	if _, err := query.Exec(id, user); err != nil {
+		return err
+	}
+	if err := tx.Commit(); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (db *sqlitedb) FavoriteGet(id, user string) (*Gif, error) {
+	row := db.db.QueryRow(`SELECT id, embed_url, still_url, downsized_url
+                               FROM favorites
+                               WHERE id = ? and user = ?`, id, user)
+	gif := &Gif{}
+	if err := row.Scan(&gif.Id, &gif.EmbedURL, &gif.StillURL, &gif.DownsizedURL); err != nil {
+		return nil, err
+	}
+	return gif, nil
+}
+
+func (db *sqlitedb) FavoriteList(user string, offset int) ([]Gif, error) {
+	records := []Gif{}
+	rows, err := db.db.Query(`SELECT id, embed_url, still_url, downsized_url
+                                FROM favorites
+                                WHERE user = ?
+                                ORDER BY id`, user)
+	if err != nil {
+		return nil, err
+	}
+	for rows.Next() {
+		var gif Gif
+		if err := rows.Scan(&gif.Id, &gif.EmbedURL, &gif.StillURL, &gif.DownsizedURL); err != nil {
+			return nil, err
+		}
+		records = append(records, gif)
+	}
+	rows.Close()
+	return records, nil
+}
+
 func migrate(db *sql.DB) error {
 	sql := "create table accounts (user text not null primary key, password text not null);"
 	_, err := db.Exec(sql)
@@ -91,7 +253,10 @@ func migrate(db *sql.DB) error {
 		return err
 	}
 
-	sql = "create table sessions (id text not null, user text not null);"
+	sql = `create table sessions
+		(id text primary key not null,
+		 user text not null,
+		 foreign key(user) references accounts(user));`
 	_, err = db.Exec(sql)
 	if err != nil {
 		return err
@@ -102,7 +267,8 @@ func migrate(db *sql.DB) error {
 		 user text not null,
 		 embed_url text not null,
 		 still_url text not null,
-		 downsized_url text not null);`
+		 downsized_url text not null,
+		 foreign key(user) references accounts(user));`
 	_, err = db.Exec(sql)
 	if err != nil {
 		return err
@@ -112,6 +278,7 @@ func migrate(db *sql.DB) error {
 		(tag text not null,
 		 user text not null,
 		 favorite text not null,
+		 foreign key(user) references accounts(user),
 		 foreign key(favorite) references favorites(id));`
 	_, err = db.Exec(sql)
 	if err != nil {
@@ -122,7 +289,7 @@ func migrate(db *sql.DB) error {
 
 func NewSqliteDB(path string) (Db, error) {
 	fmt.Printf("NewSqliteDB\n")
-	db, err := sql.Open("sqlite3", path)
+	db, err := sql.Open("sqlite3", path + "?_foreign_keys=1")
 	if err != nil {
 		return nil, err
 	}

@@ -44,6 +44,11 @@ type Gif struct {
 	DownsizedURL string `json:"downsized_url"`
 }
 
+type Tag struct {
+	Favorite string `json:"favorite"`
+	Tag      string `json:"tag"`
+}
+
 func (c *GifClient) Get(id string) (*Gif, error) {
 	url := "https://api.giphy.com/v1/gifs/" + id
 	req, reqErr := http.NewRequest("GET", url, nil)
@@ -70,6 +75,7 @@ func (c *GifClient) Get(id string) (*Gif, error) {
 		return nil, readErr
 	}
 	fmt.Printf("entire body: %+v\n", string(htmlData[:]))
+	// FIXME. Use decoder.
 	//err = json.NewDecoder(htmlData).Decode(&search)
 	err = json.Unmarshal(htmlData, &search)
 	if err != nil {

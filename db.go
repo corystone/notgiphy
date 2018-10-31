@@ -7,9 +7,17 @@ import (
 )
 
 type Db interface {
-	AccountCreate(user, password string) (error)
+	AccountCreate(user, password string) error
 	SessionCreate(user, password string) (string, error)
 	SessionGet(cookie string) (string, error)
+	FavoriteCreate(gif *Gif, user string) error
+	FavoriteDelete(id, user string) error
+	FavoriteList(user string, offset int) ([]Gif, error)
+	FavoriteGet(id, user string) (*Gif, error)
+	TagCreate(tag Tag, user string) error
+	TagDelete(tag Tag, user string) error
+	TagList(user string) ([]Tag, error)
+	FavoriteTagList(favorite, user string) ([]Tag, error)
 }
 
 type memorydb struct {
@@ -72,10 +80,24 @@ func (m *memorydb) SessionGet(cookie string) (string, error) {
 	}
 	return "", fmt.Errorf("Invalid cookie")
 }
+func (m *memorydb) FavoriteCreate(user string, gif *Gif) error {
+	return  nil
+}
+func (m *memorydb) FavoriteDelete(id, user string) error {
+	return nil
+}
+func (m *memorydb) FavoriteList(user string, offset int) ([]Gif, error) {
+	return nil, nil
+}
+func (m *memorydb) FavoriteGet(id, user string) (*Gif, error) {
+	return nil, nil
+}
 
+/*
 func NewMemoryDB() Db {
 	return &memorydb{
 		accounts: make(map[string]string),
 		sessions: make(map[string]string),
 	}
 }
+*/

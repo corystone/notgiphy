@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -37,8 +38,9 @@ func authRequired(next http.Handler, db Db) http.HandlerFunc {
 			fmt.Printf("SessionGet error: %+v\n", dberr)
 			return
 		}
-		fmt.Printf("User (%v) has a cookie", user)
-		next.ServeHTTP(w, r)
+		fmt.Printf("User (%v) has a cookie\n", user)
+		ctx := context.WithValue(r.Context(), "user", user)
+		next.ServeHTTP(w, r.WithContext(ctx))
 	}
 }
 
@@ -55,15 +57,7 @@ func rootHandler(db Db, client *GifClient) http.HandlerFunc {
 			fmt.Fprintln(w, "FIXME. YOU ARE GETTING THE index.html page")
 			return
 		}
-		page := 1
-		p := r.FormValue("p")
-		if p != "" {
-			var err error
-			page, err = strconv.Atoi(p)
-			if err != nil {
-				page = 1
-			}
-		}
+		page := getPage(r.FormValue("p"))
 		fmt.Printf("Searching for %v, page: %v\n", q, page)
 		gifs, err := client.Search(q, page)
 		if err != nil {
@@ -80,7 +74,7 @@ func rootHandler(db Db, client *GifClient) http.HandlerFunc {
 	}
 }
 
-func gifHandler(client *GifClient) http.HandlerFunc {
+func gifsHandler(client *GifClient) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != "GET" {
 			w.WriteHeader(http.StatusMethodNotAllowed)
@@ -105,6 +99,148 @@ func gifHandler(client *GifClient) http.HandlerFunc {
 		}
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(gif)
+	}
+}
+
+func getUser(r *http.Request) string {
+	if user := r.Context().Value("user"); user != nil {
+		return user.(string)
+	}
+	fmt.Printf("No USER for authed call! (Shouldn't happen...)\n")
+	return ""
+}
+
+func getPage(p string) int {
+	page, err := strconv.Atoi(p)
+	if err != nil || page < 1 {
+		return 1
+	}
+	return page
+}
+
+func favoritesHandler(db Db) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		user := getUser(r)
+		if user == "" {
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		r.ParseForm()
+		if r.Method == "POST" {
+			decoder := json.NewDecoder(r.Body)
+			var gif Gif
+			err := decoder.Decode(&gif)
+			if err != nil {
+				fmt.Printf("Json decode error: %+v\n", err)
+				w.WriteHeader(http.StatusBadRequest)
+				return
+			}
+			if err := db.FavoriteCreate(&gif, user); err != nil {
+				fmt.Printf("Db error: %+v\n", err)
+				w.WriteHeader(http.StatusBadRequest)
+				return
+			}
+			w.WriteHeader(http.StatusCreated)
+			fmt.Fprintln(w, "Created")
+			return
+		} else if r.Method == "GET" {
+			id := r.FormValue("id")
+			if id != "" {
+				gif, err := db.FavoriteGet(id, user)
+				if err != nil {
+					fmt.Printf("Db error: %+v\n", err)
+					w.WriteHeader(http.StatusBadRequest)
+					return
+				}
+				w.Header().Set("Content-Type", "application/json")
+				json.NewEncoder(w).Encode(gif)
+				return
+			}
+			page := getPage(r.FormValue("p"))
+			gifs, err := db.FavoriteList(user, (page - 1) * 25)
+			if err != nil {
+				fmt.Printf("Db error: %+v\n", err)
+				return
+			}
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode(gifs)
+			return
+		} else if r.Method == "DELETE" {
+			id := r.FormValue("id")
+			if err := db.FavoriteDelete(id, user); err != nil {
+				fmt.Printf("Db error: %+v\n", err)
+				w.WriteHeader(http.StatusBadRequest)
+				return
+			}
+			w.WriteHeader(http.StatusNoContent)
+			return
+		} else {
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+	}
+}
+
+func tagsHandler(db Db) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		user := getUser(r)
+		if user == "" {
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		r.ParseForm()
+		if r.Method == "POST" {
+			decoder := json.NewDecoder(r.Body)
+			var tag Tag
+			if err := decoder.Decode(&tag); err != nil {
+				fmt.Printf("Json decode error: %+v\n", err)
+				w.WriteHeader(http.StatusBadRequest)
+				return
+			}
+			if err := db.TagCreate(tag, user); err != nil {
+				fmt.Printf("Db error: %+v\n", err)
+				w.WriteHeader(http.StatusBadRequest)
+				return
+			}
+			w.WriteHeader(http.StatusCreated)
+			fmt.Fprintln(w, "Created")
+			return
+		} else if r.Method == "GET" {
+			favorite := r.FormValue("favorite")
+			var tags []Tag
+			var err error
+			fmt.Printf("GET TAGS, favorite: %+v\n", favorite)
+			if favorite != "" {
+				tags, err = db.FavoriteTagList(favorite, user)
+			} else {
+				tags, err = db.TagList(user)
+			}
+			if err != nil {
+				fmt.Printf("Db error: %+v\n", err)
+				return
+			}
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode(tags)
+			return
+		} else if r.Method == "DELETE" {
+			decoder := json.NewDecoder(r.Body)
+			var tag Tag
+			if err := decoder.Decode(&tag); err != nil {
+				fmt.Printf("Json decode error: %+v\n", err)
+				w.WriteHeader(http.StatusBadRequest)
+				return
+			}
+			if err := db.TagDelete(tag, user); err != nil {
+				fmt.Printf("Db error: %+v\n", err)
+				w.WriteHeader(http.StatusBadRequest)
+				return
+			}
+			w.WriteHeader(http.StatusNoContent)
+			return
+		} else {
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
 	}
 }
 
@@ -171,8 +307,10 @@ func main() {
 	client := NewGifClient(apiKey, resultsPerPage)
 
 	h.HandleFunc("/", rootHandler(db, client))
-	h.HandleFunc("/gif", gifHandler(client))
+	h.HandleFunc("/gifs", gifsHandler(client))
 	h.HandleFunc("/auth", authHandler(db))
+	h.HandleFunc("/favorites", favoritesHandler(db))
+	h.HandleFunc("/tags", tagsHandler(db))
 	h.HandleFunc("/foo", func(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintln(w, "Hello, you hit foo!")
 	})
