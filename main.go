@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"math/rand"
 	"net/http"
 	"strconv"
 	"time"
@@ -15,6 +16,11 @@ func openCORS(next http.Handler) http.HandlerFunc {
 		w.Header().Set("Access-Control-Allow-Origin", "http://localhost:4200")
 		w.Header().Set("Access-Control-Allow-Credentials", "true")
 		w.Header().Set("Access-Control-Allow-Methods", "POST, GET, OPTIONS, PUT, DELETE")
+		w.Header().Set("Access-Control-Allow-Headers", "Access-Control-Allow-Headers, Origin,Accept, X-Requested-With, Content-Type, Access-Control-Request-Method, Access-Control-Request-Headers");
+		if r.Method == "OPTIONS" {
+			fmt.Fprintln(w, "SURE, HAVE SOME OPTIONS")
+			return
+		}
 		next.ServeHTTP(w, r)
 	}
 }
@@ -140,8 +146,9 @@ func favoritesHandler(db Db) http.HandlerFunc {
 				w.WriteHeader(http.StatusBadRequest)
 				return
 			}
+			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusCreated)
-			fmt.Fprintln(w, "Created")
+			json.NewEncoder(w).Encode(gif)
 			return
 		} else if r.Method == "GET" {
 			id := r.FormValue("id")
@@ -295,6 +302,7 @@ func authHandler(db Db) http.HandlerFunc {
 func main() {
 	//db := NewMemoryDB()
 	fmt.Println("Get a db!")
+	rand.Seed(time.Now().UTC().UnixNano())
 	db, err := NewSqliteDB("foo.db")
 	if err != nil {
 		log.Fatal("DB err: %+v\n", err)
