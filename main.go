@@ -38,7 +38,11 @@ func requestLog(next http.Handler) http.HandlerFunc {
 
 func authRequired(next http.Handler, db Db) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/" || r.URL.Path == "/auth" {
+		if !strings.HasPrefix(r.URL.Path, "/api") {
+			next.ServeHTTP(w, r)
+			return
+		}
+		if strings.HasPrefix(r.URL.Path, "/api/auth" ) {
 			next.ServeHTTP(w, r)
 			return
 		}
@@ -92,7 +96,7 @@ func sendFile(s string, w http.ResponseWriter) bool {
 /* Have to do this before auth comes along and messes everything up. */
 func staticHandler(next http.Handler) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		if sendFile(r.URL.Path, w) {
+		if !strings.HasPrefix(r.URL.Path, "/api") && sendFile(r.URL.Path, w) {
 			return
 		}
 		next.ServeHTTP(w, r)
@@ -123,9 +127,6 @@ func rootHandler(db Db, client *GifClient) http.HandlerFunc {
 			fmt.Fprintln(w, "Internal Server Error")
 			fmt.Printf("Error: %v", err)
 			return
-		}
-		for _, gif := range gifs {
-			fmt.Printf("GIF: %v\n", gif)
 		}
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(gifs)
@@ -373,11 +374,11 @@ func main() {
 	client := NewGifClient(apiKey, resultsPerPage)
 
 	h.HandleFunc("/", rootHandler(db, client))
-	h.HandleFunc("/gifs", gifsHandler(client))
-	h.HandleFunc("/auth", authHandler(db))
-	h.HandleFunc("/favorites", favoritesHandler(db))
-	h.HandleFunc("/tags", tagsHandler(db))
-	h.HandleFunc("/foo", func(w http.ResponseWriter, r *http.Request) {
+	h.HandleFunc("/api/gifs", gifsHandler(client))
+	h.HandleFunc("/api/auth", authHandler(db))
+	h.HandleFunc("/api/favorites", favoritesHandler(db))
+	h.HandleFunc("/api/tags", tagsHandler(db))
+	h.HandleFunc("/api/foo", func(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintln(w, "Hello, you hit foo!")
 	})
 
