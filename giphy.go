@@ -23,9 +23,9 @@ type SearchResult struct {
 }
 
 type GifData struct {
-	Id       string  `json:"id"`
-	EmbedURL string  `json:"embed_url"`
-	Images   Images `json:"images"`
+	Id     string  `json:"id"`
+	URL    string  `json:"url"`
+	Images Images  `json:"images"`
 }
 
 type Images struct {
@@ -39,7 +39,7 @@ type ImageData struct {
 
 type Gif struct {
 	Id           string `json:"id"`
-	EmbedURL     string `json:"embed_url"`
+	URL          string `json:"url"`
 	StillURL     string `json:"still_url"`
 	DownsizedURL string `json:"downsized_url"`
 }
@@ -84,7 +84,7 @@ func (c *GifClient) Get(id string) (*Gif, error) {
 	gif := search.Gif
 	return &Gif{
 		Id: gif.Id,
-		EmbedURL: gif.EmbedURL,
+		URL: gif.URL,
 		StillURL: gif.Images.FixedWidthSmallStill.URL,
 		DownsizedURL: gif.Images.Downsized.URL}, nil
 }
@@ -129,7 +129,7 @@ func (c *GifClient) Search(query string, page int) ([]Gif, error) {
 	}
 	results := make([]Gif, 0, len(search.Gifs))
 	for _, gif := range search.Gifs {
-		result := Gif{Id: gif.Id, EmbedURL: gif.EmbedURL, StillURL: gif.Images.FixedWidthSmallStill.URL, DownsizedURL: gif.Images.Downsized.URL}
+		result := Gif{Id: gif.Id, URL: gif.URL, StillURL: gif.Images.FixedWidthSmallStill.URL, DownsizedURL: gif.Images.Downsized.URL}
 		results = append(results, result)
 	}
 

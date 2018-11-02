@@ -172,12 +172,12 @@ func (db *sqlitedb) FavoriteCreate(gif *Gif, user string) error {
 		return err
 	}
 	defer tx.Rollback()
-	query, err := tx.Prepare("INSERT INTO favorites (id, user, embed_url, still_url, downsized_url) VALUES (?, ?, ?, ?, ?)")
+	query, err := tx.Prepare("INSERT INTO favorites (id, user, url, still_url, downsized_url) VALUES (?, ?, ?, ?, ?)")
 	if err != nil {
 		return err
 	}
 	defer query.Close()
-	if _, err := query.Exec(gif.Id, user, gif.EmbedURL, gif.StillURL, gif.DownsizedURL); err != nil {
+	if _, err := query.Exec(gif.Id, user, gif.URL, gif.StillURL, gif.DownsizedURL); err != nil {
 		return err
 	}
 	if err := tx.Commit(); err != nil {
@@ -217,11 +217,11 @@ func (db *sqlitedb) FavoriteDelete(id, user string) error {
 }
 
 func (db *sqlitedb) FavoriteGet(id, user string) (*Gif, error) {
-	row := db.db.QueryRow(`SELECT id, embed_url, still_url, downsized_url
+	row := db.db.QueryRow(`SELECT id, url, still_url, downsized_url
                                FROM favorites
                                WHERE id = ? and user = ?`, id, user)
 	gif := &Gif{}
-	if err := row.Scan(&gif.Id, &gif.EmbedURL, &gif.StillURL, &gif.DownsizedURL); err != nil {
+	if err := row.Scan(&gif.Id, &gif.URL, &gif.StillURL, &gif.DownsizedURL); err != nil {
 		return nil, err
 	}
 	return gif, nil
@@ -232,12 +232,12 @@ func (db *sqlitedb) favoriteListQuery(tag, user string) ([]Gif, error) {
 	var rows *sql.Rows
 	var err error
 	if tag == "" {
-		rows, err = db.db.Query(`SELECT id, embed_url, still_url, downsized_url
+		rows, err = db.db.Query(`SELECT id, url, still_url, downsized_url
 					FROM favorites
 					WHERE user = ?
 					ORDER BY id`, user)
 	} else {
-		rows, err = db.db.Query(`SELECT f.id, f.embed_url, f.still_url, f.downsized_url
+		rows, err = db.db.Query(`SELECT f.id, f.url, f.still_url, f.downsized_url
 					FROM favorites f
 					INNER JOIN tags t ON f.id = t.favorite
 							  AND f.user = t.user
@@ -249,7 +249,7 @@ func (db *sqlitedb) favoriteListQuery(tag, user string) ([]Gif, error) {
 	}
 	for rows.Next() {
 		var gif Gif
-		if err := rows.Scan(&gif.Id, &gif.EmbedURL, &gif.StillURL, &gif.DownsizedURL); err != nil {
+		if err := rows.Scan(&gif.Id, &gif.URL, &gif.StillURL, &gif.DownsizedURL); err != nil {
 			return nil, err
 		}
 		records = append(records, gif)
@@ -285,7 +285,7 @@ func migrate(db *sql.DB) error {
 	sql = `create table favorites 
 		(id text not null,
 		 user text not null,
-		 embed_url text not null,
+		 url text not null,
 		 still_url text not null,
 		 downsized_url text not null,
 		 primary key (id, user),
