@@ -9,6 +9,7 @@ import (
 	"math/rand"
 	"net/http"
 	"os"
+	"path"
 	"strconv"
 	"strings"
 	"time"
@@ -21,7 +22,7 @@ func openCORS(next http.Handler) http.HandlerFunc {
 		w.Header().Set("Access-Control-Allow-Methods", "POST, GET, OPTIONS, PUT, DELETE")
 		w.Header().Set("Access-Control-Allow-Headers", "Access-Control-Allow-Headers, Origin,Accept, X-Requested-With, Content-Type, Access-Control-Request-Method, Access-Control-Request-Headers");
 		if r.Method == "OPTIONS" {
-			fmt.Fprintln(w, "SURE, HAVE SOME OPTIONS")
+			fmt.Fprintln(w, "")
 			return
 		}
 		next.ServeHTTP(w, r)
@@ -61,9 +62,9 @@ func authRequired(next http.Handler, db Db) http.HandlerFunc {
 
 // If the path exists in the static directory, send that file.
 // This lets us boostrap the angular app's static files.
-func sendFile(path string, w http.ResponseWriter) bool {
+func sendFile(s string, w http.ResponseWriter) bool {
 	prefix := "./static"
-	fullpath := prefix + path
+	fullpath := path.Clean(prefix + s)
 	stat, err := os.Stat(fullpath)
 	if err == nil && stat.Mode().IsRegular() {
 		f, err := os.Open(fullpath)
@@ -88,6 +89,7 @@ func sendFile(path string, w http.ResponseWriter) bool {
 	return false
 }
 
+/* Have to do this before auth comes along and messes everything up. */
 func staticHandler(next http.Handler) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if sendFile(r.URL.Path, w) {
