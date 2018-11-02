@@ -27,7 +27,7 @@ type memorydb struct {
 	m        sync.Mutex
 }
 
-func (m *memorydb) AccountCreate(user, password string) (error) {
+func (m *memorydb) AccountCreate(user, password string) error {
 	m.m.Lock()
 	defer m.m.Unlock()
 	if _, ok := m.accounts[user]; ok {
@@ -82,7 +82,7 @@ func (m *memorydb) SessionGet(cookie string) (string, error) {
 	return "", fmt.Errorf("Invalid cookie")
 }
 func (m *memorydb) FavoriteCreate(user string, gif *Gif) error {
-	return  nil
+	return nil
 }
 func (m *memorydb) FavoriteDelete(id, user string) error {
 	return nil

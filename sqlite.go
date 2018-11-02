@@ -8,10 +8,10 @@ import (
 
 type sqlitedb struct {
 	Path string
-	db *sql.DB
+	db   *sql.DB
 }
 
-func (db *sqlitedb) AccountCreate(user, password string) (error) {
+func (db *sqlitedb) AccountCreate(user, password string) error {
 	tx, err := db.db.Begin()
 	if err != nil {
 		return err
@@ -309,7 +309,7 @@ func migrate(db *sql.DB) error {
 }
 
 func NewSqliteDB(path string) (Db, error) {
-	db, err := sql.Open("sqlite3", path + "?_foreign_keys=1")
+	db, err := sql.Open("sqlite3", path+"?_foreign_keys=1")
 	if err != nil {
 		return nil, err
 	}
@@ -328,6 +328,6 @@ func NewSqliteDB(path string) (Db, error) {
 
 	return &sqlitedb{
 		Path: path,
-		db: db,
+		db:   db,
 	}, nil
 }

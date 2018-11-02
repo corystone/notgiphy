@@ -20,7 +20,7 @@ func openCORS(next http.Handler) http.HandlerFunc {
 		w.Header().Set("Access-Control-Allow-Origin", "http://localhost:4200")
 		w.Header().Set("Access-Control-Allow-Credentials", "true")
 		w.Header().Set("Access-Control-Allow-Methods", "POST, GET, OPTIONS, PUT, DELETE")
-		w.Header().Set("Access-Control-Allow-Headers", "Access-Control-Allow-Headers, Origin,Accept, X-Requested-With, Content-Type, Access-Control-Request-Method, Access-Control-Request-Headers");
+		w.Header().Set("Access-Control-Allow-Headers", "Access-Control-Allow-Headers, Origin,Accept, X-Requested-With, Content-Type, Access-Control-Request-Method, Access-Control-Request-Headers")
 		if r.Method == "OPTIONS" {
 			fmt.Fprintln(w, "")
 			return
@@ -42,7 +42,7 @@ func authRequired(next http.Handler, db Db) http.HandlerFunc {
 			next.ServeHTTP(w, r)
 			return
 		}
-		if strings.HasPrefix(r.URL.Path, "/api/auth" ) {
+		if strings.HasPrefix(r.URL.Path, "/api/auth") {
 			next.ServeHTTP(w, r)
 			return
 		}
@@ -396,4 +396,3 @@ func main() {
 		log.Fatal(err)
 	}
 }
-

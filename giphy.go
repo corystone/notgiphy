@@ -23,14 +23,14 @@ type SearchResult struct {
 }
 
 type GifData struct {
-	Id     string  `json:"id"`
-	URL    string  `json:"url"`
-	Images Images  `json:"images"`
+	Id     string `json:"id"`
+	URL    string `json:"url"`
+	Images Images `json:"images"`
 }
 
 type Images struct {
 	FixedWidthSmallStill ImageData `json:"fixed_width_small_still"`
-	Downsized ImageData `json:"downsized"`
+	Downsized            ImageData `json:"downsized"`
 }
 
 type ImageData struct {
@@ -80,9 +80,9 @@ func (c *GifClient) Get(id string) (*Gif, error) {
 	}
 	gif := search.Gif
 	return &Gif{
-		Id: gif.Id,
-		URL: gif.URL,
-		StillURL: gif.Images.FixedWidthSmallStill.URL,
+		Id:           gif.Id,
+		URL:          gif.URL,
+		StillURL:     gif.Images.FixedWidthSmallStill.URL,
 		DownsizedURL: gif.Images.Downsized.URL}, nil
 }
 
@@ -100,7 +100,7 @@ func (c *GifClient) Search(query string, page int) ([]Gif, error) {
 	if page < 1 {
 		page = 1
 	}
-	q.Add("offset", strconv.Itoa((page - 1) * c.PerPage))
+	q.Add("offset", strconv.Itoa((page-1)*c.PerPage))
 	req.URL.RawQuery = q.Encode()
 
 	resp, err := c.client.Do(req)
@@ -131,7 +131,7 @@ func (c *GifClient) Search(query string, page int) ([]Gif, error) {
 	return results, nil
 }
 
-func NewGifClient(key string, perPage int) *GifClient{
+func NewGifClient(key string, perPage int) *GifClient {
 	if perPage < 1 {
 		perPage = 1
 	}
