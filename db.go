@@ -12,12 +12,13 @@ type Db interface {
 	SessionGet(cookie string) (string, error)
 	FavoriteCreate(gif *Gif, user string) error
 	FavoriteDelete(id, user string) error
-	FavoriteList(user string, offset int) ([]Gif, error)
+	FavoriteList(user string) ([]Gif, error)
 	FavoriteGet(id, user string) (*Gif, error)
 	TagCreate(tag Tag, user string) error
 	TagDelete(tag Tag, user string) error
 	TagList(user string) ([]Tag, error)
 	FavoriteTagList(favorite, user string) ([]Tag, error)
+	FavoriteListByTag(tag, user string) ([]Gif, error)
 }
 
 type memorydb struct {

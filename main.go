@@ -163,10 +163,22 @@ func favoritesHandler(db Db) http.HandlerFunc {
 				json.NewEncoder(w).Encode(gif)
 				return
 			}
-			page := getPage(r.FormValue("p"))
-			gifs, err := db.FavoriteList(user, (page - 1) * 25)
+			tag := r.FormValue("tag")
+			if tag != "" {
+				gifs, err := db.FavoriteListByTag(tag, user)
+				if err != nil {
+					fmt.Printf("Db error: %+v\n", err)
+					w.WriteHeader(http.StatusInternalServerError)
+					return
+				}
+				w.Header().Set("Content-Type", "application/json")
+				json.NewEncoder(w).Encode(gifs)
+				return
+			}
+			gifs, err := db.FavoriteList(user)
 			if err != nil {
 				fmt.Printf("Db error: %+v\n", err)
+				w.WriteHeader(http.StatusInternalServerError)
 				return
 			}
 			w.Header().Set("Content-Type", "application/json")
@@ -210,7 +222,8 @@ func tagsHandler(db Db) http.HandlerFunc {
 				return
 			}
 			w.WriteHeader(http.StatusCreated)
-			fmt.Fprintln(w, "Created")
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode(tag)
 			return
 		} else if r.Method == "GET" {
 			favorite := r.FormValue("favorite")
@@ -230,6 +243,10 @@ func tagsHandler(db Db) http.HandlerFunc {
 			json.NewEncoder(w).Encode(tags)
 			return
 		} else if r.Method == "DELETE" {
+			tag := Tag{Favorite: r.FormValue("favorite"), Tag: r.FormValue("tag")}
+			/*
+			favorite := r.FormValue("favorite")
+			tag := r.FormValue("tag")
 			decoder := json.NewDecoder(r.Body)
 			var tag Tag
 			if err := decoder.Decode(&tag); err != nil {
@@ -237,6 +254,7 @@ func tagsHandler(db Db) http.HandlerFunc {
 				w.WriteHeader(http.StatusBadRequest)
 				return
 			}
+			*/
 			if err := db.TagDelete(tag, user); err != nil {
 				fmt.Printf("Db error: %+v\n", err)
 				w.WriteHeader(http.StatusBadRequest)

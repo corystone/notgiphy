@@ -135,7 +135,8 @@ func (db *sqlitedb) tagListQuery(favorite, user string) ([]Tag, error) {
 		rows, err = db.db.Query(`SELECT tag, favorite
                                 FROM tags
                                 WHERE user = ?
-                                ORDER BY tag`, user)
+                                GROUP BY tag
+				ORDER BY tag`, user)
 	} else {
 		rows, err = db.db.Query(`SELECT tag, favorite
                                 FROM tags
@@ -226,12 +227,23 @@ func (db *sqlitedb) FavoriteGet(id, user string) (*Gif, error) {
 	return gif, nil
 }
 
-func (db *sqlitedb) FavoriteList(user string, offset int) ([]Gif, error) {
+func (db *sqlitedb) favoriteListQuery(tag, user string) ([]Gif, error) {
 	records := []Gif{}
-	rows, err := db.db.Query(`SELECT id, embed_url, still_url, downsized_url
-                                FROM favorites
-                                WHERE user = ?
-                                ORDER BY id`, user)
+	var rows *sql.Rows
+	var err error
+	if tag == "" {
+		rows, err = db.db.Query(`SELECT id, embed_url, still_url, downsized_url
+					FROM favorites
+					WHERE user = ?
+					ORDER BY id`, user)
+	} else {
+		rows, err = db.db.Query(`SELECT f.id, f.embed_url, f.still_url, f.downsized_url
+					FROM favorites f
+					INNER JOIN tags t ON f.id = t.favorite
+							  AND f.user = t.user
+					WHERE f.user = ? and t.tag = ?
+					ORDER BY id`, user, tag)
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -244,6 +256,14 @@ func (db *sqlitedb) FavoriteList(user string, offset int) ([]Gif, error) {
 	}
 	rows.Close()
 	return records, nil
+}
+
+func (db *sqlitedb) FavoriteListByTag(tag, user string) ([]Gif, error) {
+	return db.favoriteListQuery(tag, user)
+}
+
+func (db *sqlitedb) FavoriteList(user string) ([]Gif, error) {
+	return db.favoriteListQuery("", user)
 }
 
 func migrate(db *sql.DB) error {
@@ -268,6 +288,7 @@ func migrate(db *sql.DB) error {
 		 embed_url text not null,
 		 still_url text not null,
 		 downsized_url text not null,
+		 primary key (id, user),
 		 foreign key(user) references accounts(user));`
 	_, err = db.Exec(sql)
 	if err != nil {
@@ -278,8 +299,9 @@ func migrate(db *sql.DB) error {
 		(tag text not null,
 		 user text not null,
 		 favorite text not null,
+		 primary key (tag, user, favorite),
 		 foreign key(user) references accounts(user),
-		 foreign key(favorite) references favorites(id));`
+		 foreign key(favorite, user) references favorites(id, user));`
 	_, err = db.Exec(sql)
 	if err != nil {
 		return err
