@@ -4,10 +4,13 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"math/rand"
 	"net/http"
+	"os"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -21,6 +24,13 @@ func openCORS(next http.Handler) http.HandlerFunc {
 			fmt.Fprintln(w, "SURE, HAVE SOME OPTIONS")
 			return
 		}
+		next.ServeHTTP(w, r)
+	}
+}
+
+func requestLog(next http.Handler) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		fmt.Printf("REQUEST, Method: %v, URL: %v\n", r.Method, r.URL)
 		next.ServeHTTP(w, r)
 	}
 }
@@ -44,9 +54,46 @@ func authRequired(next http.Handler, db Db) http.HandlerFunc {
 			fmt.Printf("SessionGet error: %+v\n", dberr)
 			return
 		}
-		fmt.Printf("User (%v) has a cookie\n", user)
 		ctx := context.WithValue(r.Context(), "user", user)
 		next.ServeHTTP(w, r.WithContext(ctx))
+	}
+}
+
+// If the path exists in the static directory, send that file.
+// This lets us boostrap the angular app's static files.
+func sendFile(path string, w http.ResponseWriter) bool {
+	prefix := "./static"
+	fullpath := prefix + path
+	stat, err := os.Stat(fullpath)
+	if err == nil && stat.Mode().IsRegular() {
+		f, err := os.Open(fullpath)
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			fmt.Printf("ERROR os.Open: %+v\n", err)
+			fmt.Fprintln(w, "Internal Server Error")
+			return true
+		}
+		/* Browsers seem to hate it if you send css text/plain. */
+		if strings.HasSuffix(fullpath, ".css") {
+			w.Header().Set("Content-Type", "text/css")
+		}
+		if _, err := io.Copy(w, f); err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			fmt.Printf("ERROR io.Copy: %+v\n", err)
+			fmt.Fprintln(w, "Internal Server Error")
+			return true
+		}
+		return true
+	}
+	return false
+}
+
+func staticHandler(next http.Handler) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if sendFile(r.URL.Path, w) {
+			return
+		}
+		next.ServeHTTP(w, r)
 	}
 }
 
@@ -60,11 +107,14 @@ func rootHandler(db Db, client *GifClient) http.HandlerFunc {
 		r.ParseForm()
 		q := r.FormValue("q")
 		if q == "" {
-			fmt.Fprintln(w, "FIXME. YOU ARE GETTING THE index.html page")
+			if !sendFile("/index.html", w) {
+				w.WriteHeader(http.StatusInternalServerError)
+				fmt.Fprintln(w, "Internal Server Error")
+				fmt.Printf("Couldnt send static index.html\n")
+			}
 			return
 		}
 		page := getPage(r.FormValue("p"))
-		fmt.Printf("Searching for %v, page: %v\n", q, page)
 		gifs, err := client.Search(q, page)
 		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
@@ -112,7 +162,7 @@ func getUser(r *http.Request) string {
 	if user := r.Context().Value("user"); user != nil {
 		return user.(string)
 	}
-	fmt.Printf("No USER for authed call! (Shouldn't happen...)\n")
+	fmt.Printf("ERROR: No USER for authed call! (Shouldn't happen...)\n")
 	return ""
 }
 
@@ -229,7 +279,6 @@ func tagsHandler(db Db) http.HandlerFunc {
 			favorite := r.FormValue("favorite")
 			var tags []Tag
 			var err error
-			fmt.Printf("GET TAGS, favorite: %+v\n", favorite)
 			if favorite != "" {
 				tags, err = db.FavoriteTagList(favorite, user)
 			} else {
@@ -244,17 +293,6 @@ func tagsHandler(db Db) http.HandlerFunc {
 			return
 		} else if r.Method == "DELETE" {
 			tag := Tag{Favorite: r.FormValue("favorite"), Tag: r.FormValue("tag")}
-			/*
-			favorite := r.FormValue("favorite")
-			tag := r.FormValue("tag")
-			decoder := json.NewDecoder(r.Body)
-			var tag Tag
-			if err := decoder.Decode(&tag); err != nil {
-				fmt.Printf("Json decode error: %+v\n", err)
-				w.WriteHeader(http.StatusBadRequest)
-				return
-			}
-			*/
 			if err := db.TagDelete(tag, user); err != nil {
 				fmt.Printf("Db error: %+v\n", err)
 				w.WriteHeader(http.StatusBadRequest)
@@ -319,13 +357,13 @@ func authHandler(db Db) http.HandlerFunc {
 
 func main() {
 	//db := NewMemoryDB()
-	fmt.Println("Get a db!")
+	dbpath := "foo.db"
 	rand.Seed(time.Now().UTC().UnixNano())
-	db, err := NewSqliteDB("foo.db")
+	db, err := NewSqliteDB(dbpath)
 	if err != nil {
 		log.Fatal("DB err: %+v\n", err)
 	}
-	fmt.Println("GOT a db!")
+	fmt.Printf("Using database: %+v\n", dbpath)
 	h := http.NewServeMux()
 	// FIXME. Config or ENV or something. This is the "public beta key"
 	apiKey := "dc6zaTOxFJmzC"
@@ -345,12 +383,12 @@ func main() {
 		fmt.Fprintln(w, "Hello, you hit bar!")
 	})
 
-	// FIXME. The auth off switch.
 	authed := authRequired(h, db)
 	cors := openCORS(authed)
-	//cors := openCORS(h)
+	static := staticHandler(cors)
+	logged := requestLog(static)
 
-	err = http.ListenAndServe(":9999", cors)
+	err = http.ListenAndServe(":9999", logged)
 	if err != nil {
 		log.Fatal(err)
 	}

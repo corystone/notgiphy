@@ -130,7 +130,6 @@ func (db *sqlitedb) tagListQuery(favorite, user string) ([]Tag, error) {
 	records := []Tag{}
 	var rows *sql.Rows
 	var err error
-	fmt.Printf("tagListQuery, favorite: %+v, user: %+v\n", favorite, user)
 	if favorite == "" {
 		rows, err = db.db.Query(`SELECT tag, favorite
                                 FROM tags
@@ -151,7 +150,6 @@ func (db *sqlitedb) tagListQuery(favorite, user string) ([]Tag, error) {
 		if err := rows.Scan(&tag.Tag, &tag.Favorite); err != nil {
 			return nil, err
 		}
-		fmt.Printf("GOT A TAG? %+v\n", tag)
 		records = append(records, tag)
 	}
 	rows.Close()
@@ -267,6 +265,7 @@ func (db *sqlitedb) FavoriteList(user string) ([]Gif, error) {
 }
 
 func migrate(db *sql.DB) error {
+	fmt.Printf("Creating database schema\n")
 	sql := "create table accounts (user text not null primary key, password text not null);"
 	_, err := db.Exec(sql)
 	if err != nil {
@@ -310,7 +309,6 @@ func migrate(db *sql.DB) error {
 }
 
 func NewSqliteDB(path string) (Db, error) {
-	fmt.Printf("NewSqliteDB\n")
 	db, err := sql.Open("sqlite3", path + "?_foreign_keys=1")
 	if err != nil {
 		return nil, err

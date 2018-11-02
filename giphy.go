@@ -59,8 +59,6 @@ func (c *GifClient) Get(id string) (*Gif, error) {
 	q.Add("api_key", c.Key)
 	req.URL.RawQuery = q.Encode()
 
-	fmt.Printf("REQ: %+v\n", req)
-
 	resp, err := c.client.Do(req)
 	if resp != nil {
 		defer resp.Body.Close()
@@ -74,9 +72,8 @@ func (c *GifClient) Get(id string) (*Gif, error) {
 	if readErr != nil {
 		return nil, readErr
 	}
-	fmt.Printf("entire body: %+v\n", string(htmlData[:]))
 	// FIXME. Use decoder.
-	//err = json.NewDecoder(htmlData).Decode(&search)
+	//err = json.NewDecoder(resp.Body).Decode(&search)
 	err = json.Unmarshal(htmlData, &search)
 	if err != nil {
 		return nil, err
@@ -106,8 +103,6 @@ func (c *GifClient) Search(query string, page int) ([]Gif, error) {
 	q.Add("offset", strconv.Itoa((page - 1) * c.PerPage))
 	req.URL.RawQuery = q.Encode()
 
-	fmt.Printf("REQ: %+v\n", req)
-
 	resp, err := c.client.Do(req)
 	if resp != nil {
 		defer resp.Body.Close()
@@ -122,7 +117,7 @@ func (c *GifClient) Search(query string, page int) ([]Gif, error) {
 		return nil, readErr
 	}
 	//fmt.Printf("entire body: %+v\n", string(htmlData[:]))
-	//err = json.NewDecoder(htmlData).Decode(&search)
+	//err = json.NewDecoder(resp.Body).Decode(&search)
 	err = json.Unmarshal(htmlData, &search)
 	if err != nil {
 		return nil, err
