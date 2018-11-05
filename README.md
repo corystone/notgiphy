@@ -18,9 +18,10 @@ NotGiphy is written in Go, with only [mattn/go-sqlite3](https://github.com/mattn
 4. go get github.com/mattn/go-sqlite3
 5. make
 
-### Make it work
-1. build [NotGiphyUI](https://github.com/corystone/notgiphyui)
+### Put the pieces together
+1. Build [NotGiphyUI](https://github.com/corystone/notgiphyui) separately.
 2. mkdir static
-3. copy all the files from notgiphyui/dist to static
-4. if you have your own giphy api key: export NOTGIPHY\_API\_KEY=\<your\_api\_key\>
+3. Copy all the files from notgiphyui/dist to static
+4. If you have your own giphy api key: export NOTGIPHY\_API\_KEY=\<your\_api\_key\>
+  * Otherwise it will use a public beta key
 5. ./bin/notgiphy
