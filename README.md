@@ -11,7 +11,7 @@ NotGiphy is written in Go, with only [mattn/go-sqlite3](https://github.com/mattn
 2. tar -C /usr/local -xzf go1.11.2.linux-amd64.tar.gz
 3. export PATH=$PATH:/usr/local/go/bin
 
-### Install NotGiphy
+### Build NotGiphy
 1. git clone https://github.com/corystone/notgiphy.git ~/go/src/github.com/corystone/notgiphy
 2. apt-get install gcc libc6-dev make
 3. cd ~/go/src/github.com/corystone/notgiphy
