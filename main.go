@@ -32,21 +32,19 @@ func openCORS(next http.Handler) http.HandlerFunc {
 func requestLog(next http.Handler) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		fmt.Printf("REQUEST, Method: %v, URL: %v\n", r.Method, r.URL)
+		fmt.Printf("FULL REQUEST: %+v\n", r)
 		next.ServeHTTP(w, r)
 	}
 }
 
 func authRequired(next http.Handler, db Db) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		if !strings.HasPrefix(r.URL.Path, "/api") {
-			next.ServeHTTP(w, r)
-			return
-		}
-		if strings.HasPrefix(r.URL.Path, "/api/auth") {
+		if !strings.HasPrefix(r.URL.Path, "/api") || strings.HasPrefix(r.URL.Path, "/api/auth") || r.URL.Path == "/api/gifs" {
 			next.ServeHTTP(w, r)
 			return
 		}
 		cookie, err := r.Cookie("sessionid")
+		fmt.Printf("COOKIE: %v\n", cookie)
 		if err != nil {
 			w.WriteHeader(http.StatusUnauthorized)
 			fmt.Printf("Cookie error: %+v\n", err)
@@ -323,7 +321,7 @@ func authHandler(db Db) http.HandlerFunc {
 				return
 			}
 			expiration := time.Now().Add(24 * time.Hour)
-			cookie := http.Cookie{Name: "sessionid", Value: sessionId, Expires: expiration}
+			cookie := http.Cookie{Name: "sessionid", Value: sessionId, Expires: expiration, Path: "/"}
 			http.SetCookie(w, &cookie)
 			fmt.Fprintln(w, "Success")
 			return
@@ -344,7 +342,7 @@ func authHandler(db Db) http.HandlerFunc {
 				return
 			}
 			expiration := time.Now().Add(24 * time.Hour)
-			cookie := http.Cookie{Name: "sessionid", Value: sessionId, Expires: expiration}
+			cookie := http.Cookie{Name: "sessionid", Value: sessionId, Expires: expiration, Path: "/"}
 			http.SetCookie(w, &cookie)
 			fmt.Fprintln(w, "Success")
 		} else if r.Method == "OPTIONS" {
