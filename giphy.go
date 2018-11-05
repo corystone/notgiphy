@@ -3,7 +3,6 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"net/http"
 	"strconv"
 )
@@ -49,6 +48,7 @@ type Tag struct {
 	Tag      string `json:"tag"`
 }
 
+/* Fetch a single gif. */
 func (c *GifClient) Get(id string) (*Gif, error) {
 	url := "https://api.giphy.com/v1/gifs/" + id
 	req, reqErr := http.NewRequest("GET", url, nil)
@@ -68,13 +68,7 @@ func (c *GifClient) Get(id string) (*Gif, error) {
 	}
 
 	var search GifResult
-	htmlData, readErr := ioutil.ReadAll(resp.Body)
-	if readErr != nil {
-		return nil, readErr
-	}
-	// FIXME. Use decoder.
-	//err = json.NewDecoder(resp.Body).Decode(&search)
-	err = json.Unmarshal(htmlData, &search)
+	err = json.NewDecoder(resp.Body).Decode(&search)
 	if err != nil {
 		return nil, err
 	}
@@ -86,6 +80,7 @@ func (c *GifClient) Get(id string) (*Gif, error) {
 		DownsizedURL: gif.Images.Downsized.URL}, nil
 }
 
+/* Query and return a page of gifs. */
 func (c *GifClient) Search(query string, page int) ([]Gif, error) {
 	url := "https://api.giphy.com/v1/gifs/search"
 	req, reqErr := http.NewRequest("GET", url, nil)
@@ -112,13 +107,7 @@ func (c *GifClient) Search(query string, page int) ([]Gif, error) {
 	}
 
 	var search SearchResult
-	htmlData, readErr := ioutil.ReadAll(resp.Body)
-	if readErr != nil {
-		return nil, readErr
-	}
-	//fmt.Printf("entire body: %+v\n", string(htmlData[:]))
-	//err = json.NewDecoder(resp.Body).Decode(&search)
-	err = json.Unmarshal(htmlData, &search)
+	err = json.NewDecoder(resp.Body).Decode(&search)
 	if err != nil {
 		return nil, err
 	}

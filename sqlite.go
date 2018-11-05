@@ -266,7 +266,9 @@ func (db *sqlitedb) FavoriteList(user string) ([]Gif, error) {
 
 func migrate(db *sql.DB) error {
 	fmt.Printf("Creating database schema\n")
-	sql := "create table accounts (user text not null primary key, password text not null);"
+	sql := `create table accounts
+                (user text not null primary key,
+                 password text not null);`
 	_, err := db.Exec(sql)
 	if err != nil {
 		return err
@@ -315,6 +317,7 @@ func NewSqliteDB(path string) (Db, error) {
 	}
 
 	var name string
+	/* If we don't have an accounts table, assume empty db and create the whole schema. */
 	if err := db.QueryRow("SELECT name FROM sqlite_master WHERE name = 'accounts'").Scan(&name); err != nil {
 		if err == sql.ErrNoRows {
 			err = migrate(db)

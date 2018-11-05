@@ -15,6 +15,7 @@ import (
 	"time"
 )
 
+/* This handler sets all the required headers for CORS to work from localhost, for  UI development. */
 func openCORS(next http.Handler) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Access-Control-Allow-Origin", "http://localhost:4200")
@@ -29,6 +30,7 @@ func openCORS(next http.Handler) http.HandlerFunc {
 	}
 }
 
+/* Print the request to stdout. */
 func requestLog(next http.Handler) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		fmt.Printf("REQUEST, Method: %v, URL: %v\n", r.Method, r.URL)
@@ -37,6 +39,7 @@ func requestLog(next http.Handler) http.HandlerFunc {
 	}
 }
 
+/* Cheecks to see if the cookie is valid. Sets the user in the request context for downstream handelers. */
 func authRequired(next http.Handler, db Db) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if !strings.HasPrefix(r.URL.Path, "/api") || strings.HasPrefix(r.URL.Path, "/api/auth") || r.URL.Path == "/api/gifs" {
@@ -44,7 +47,6 @@ func authRequired(next http.Handler, db Db) http.HandlerFunc {
 			return
 		}
 		cookie, err := r.Cookie("sessionid")
-		fmt.Printf("COOKIE: %v\n", cookie)
 		if err != nil {
 			w.WriteHeader(http.StatusUnauthorized)
 			fmt.Printf("Cookie error: %+v\n", err)
@@ -62,8 +64,8 @@ func authRequired(next http.Handler, db Db) http.HandlerFunc {
 	}
 }
 
-// If the path exists in the static directory, send that file.
-// This lets us boostrap the angular app's static files.
+/* If the path exists in the static directory, send that file.
+ * This lets us boostrap the angular app's static files. */
 func sendFile(s string, w http.ResponseWriter) bool {
 	prefix := "./static"
 	fullpath := path.Clean(prefix + s)
@@ -91,7 +93,7 @@ func sendFile(s string, w http.ResponseWriter) bool {
 	return false
 }
 
-/* Have to do this before auth comes along and messes everything up. */
+/* If not an api call, try sending the path from static. */
 func staticHandler(next http.Handler) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if !strings.HasPrefix(r.URL.Path, "/api") && sendFile(r.URL.Path, w) {
@@ -101,11 +103,11 @@ func staticHandler(next http.Handler) http.HandlerFunc {
 	}
 }
 
+/* Last handler handles gif queries and falls back to sending index.html. */
 func rootHandler(db Db, client *GifClient) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != "GET" {
 			w.WriteHeader(http.StatusBadRequest)
-			fmt.Fprintln(w, "NO SOUP FOR YOU")
 			return
 		}
 		r.ParseForm()
@@ -131,17 +133,17 @@ func rootHandler(db Db, client *GifClient) http.HandlerFunc {
 	}
 }
 
+/* Gets a single gif. */
 func gifsHandler(client *GifClient) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != "GET" {
 			w.WriteHeader(http.StatusMethodNotAllowed)
-			fmt.Fprintln(w, "Only GETS please")
 			return
 		}
 		id := r.URL.Query().Get("id")
 		if id == "" {
 			w.WriteHeader(http.StatusBadRequest)
-			fmt.Fprintln(w, "BAD ID")
+			fmt.Fprintf(w, "Missing id")
 			return
 		}
 		gif, err := client.Get(id)
@@ -175,6 +177,7 @@ func getPage(p string) int {
 	return page
 }
 
+/* Adding/removing favorites. Getting favorites lists, full and by tag. */
 func favoritesHandler(db Db) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		user := getUser(r)
@@ -251,6 +254,7 @@ func favoritesHandler(db Db) http.HandlerFunc {
 	}
 }
 
+/* Adding/removing tags. Getting tag lists (full and by favorite). */
 func tagsHandler(db Db) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		user := getUser(r)
@@ -308,6 +312,7 @@ func tagsHandler(db Db) http.HandlerFunc {
 	}
 }
 
+/* Handles register/login. Tells the client to set a cookie. */
 func authHandler(db Db) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == "POST" {
@@ -345,19 +350,17 @@ func authHandler(db Db) http.HandlerFunc {
 			cookie := http.Cookie{Name: "sessionid", Value: sessionId, Expires: expiration, Path: "/"}
 			http.SetCookie(w, &cookie)
 			fmt.Fprintln(w, "Success")
-		} else if r.Method == "OPTIONS" {
-			fmt.Fprintln(w, "SURE, HAVE SOME OPTIONS")
-			return
 		} else {
 			w.WriteHeader(http.StatusBadRequest)
-			fmt.Fprintln(w, "NO SOUP FOR YOU")
 			return
 		}
 	}
 }
 
+/* Sets up the db connection, the giphy client, and the http server. */
+/* The handler chain looks like:
+ * logger -> static -> cors -> auth -> router */
 func main() {
-	//db := NewMemoryDB()
 	dbpath := "foo.db"
 	rand.Seed(time.Now().UTC().UnixNano())
 	db, err := NewSqliteDB(dbpath)
@@ -366,8 +369,13 @@ func main() {
 	}
 	fmt.Printf("Using database: %+v\n", dbpath)
 	h := http.NewServeMux()
-	// FIXME. Config or ENV or something. This is the "public beta key"
-	apiKey := "dc6zaTOxFJmzC"
+	var apiKey string
+	if key, ok := os.LookupEnv("NOTGIPHY_API_KEY"); ok {
+		apiKey = key
+	} else {
+		apiKey = "dc6zaTOxFJmzC"
+	}
+	fmt.Printf("Giphy api key: %v\n", apiKey)
 	resultsPerPage := 25
 	client := NewGifClient(apiKey, resultsPerPage)
 
@@ -376,13 +384,6 @@ func main() {
 	h.HandleFunc("/api/auth", authHandler(db))
 	h.HandleFunc("/api/favorites", favoritesHandler(db))
 	h.HandleFunc("/api/tags", tagsHandler(db))
-	h.HandleFunc("/api/foo", func(w http.ResponseWriter, r *http.Request) {
-		fmt.Fprintln(w, "Hello, you hit foo!")
-	})
-
-	h.HandleFunc("/bar", func(w http.ResponseWriter, r *http.Request) {
-		fmt.Fprintln(w, "Hello, you hit bar!")
-	})
 
 	authed := authRequired(h, db)
 	cors := openCORS(authed)
