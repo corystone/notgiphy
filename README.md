@@ -4,7 +4,7 @@ This is the backend service for [NotGiphyUI](https://github.com/corystone/notgip
 
 NotGiphy is written in Go, with only [mattn/go-sqlite3](https://github.com/mattn/go-sqlite3) as a dependency.
 
-## Quickstart instructions (apt)
+## Quickstart instructions (on Ubuntu 16.04)
 
 ### Get golang working
 1. wget https://dl.google.com/go/go1.11.2.linux-amd64.tar.gz
